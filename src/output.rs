@@ -35,6 +35,7 @@ impl OutputType {
         use std::process::{Command, Stdio};
 
         let mut replace_arguments_to_less = false;
+        let mut replace_pager_command = false;
 
         let pager_from_env = match (env::var("BAT_PAGER"), env::var("PAGER")) {
             (Ok(bat_pager), _) => Some(bat_pager),
@@ -46,10 +47,16 @@ impl OutputType {
                 // We only do this for PAGER (as it is not specific to 'bat'), not for BAT_PAGER
                 // or bats '--pager' command line option.
                 replace_arguments_to_less = true;
+                replace_pager_command = true;
                 Some(pager)
             }
             _ => None,
         };
+
+        if replace_pager_command {
+            // TODO: check for supported pagers, but do not change if taken from BAT_PAGER
+            eprintln!("got pager from env PAGER");
+        }
 
         let pager_from_config = pager_from_config.map(|p| p.to_string());
 
@@ -70,6 +77,13 @@ impl OutputType {
 
                 if pager_path.file_stem() == Some(&OsString::from("bat")) {
                     pager_path = PathBuf::from("less");
+                }
+
+                if replace_pager_command {
+                    let ignored_pagers = vec!["more", "most"];
+                    if ignored_pagers.iter().any(|&pg| Some(&OsString::from(pg)) == pager_path.file_stem()) {
+                        panic!("got an ignored pager")
+                    }
                 }
 
                 let is_less = pager_path.file_stem() == Some(&OsString::from("less"));
